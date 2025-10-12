@@ -228,7 +228,7 @@ class Game:
         elif self.state == State.END:
             pool = self.best + self.results
             self.best = heapq.nlargest(100, pool, lambda x: x[0])
-            self.best = sorted(self.best, key = lambda x : x[0])
+            self.best = sorted(self.best, key = lambda x : x[0], reverse = True)
             self.results.clear()
             for _, strain in self.best:
                 for _ in range(2):
