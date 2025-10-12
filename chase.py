@@ -13,21 +13,46 @@ def random_color():
         random.randint(0, 255),
         random.randint(0, 255))
 
+
+class Strain:
+
+    ID_COUNTER = 1
+
+    def __init__(self):
+        self.brain = None
+        self.id = 0
+        self.color = pygame.Color("black")
+
+    def basic():
+        strain = Strain()
+        strain.brain = Brain.basic(8, 3, 64)
+        strain.id = Strain.ID_COUNTER
+        Strain.ID_COUNTER += 1
+        strain.color = random_color()
+        return strain
+
+    def split(self):
+        child = Strain()
+        child.brain = self.brain.copy()
+        child.brain.mutate(0.20)
+        child.id = self.id
+        child.color = self.color
+        return child
+
 class Actor:
 
     def __init__(self):
         self.pos = pygame.Vector2()
-        self.color = random_color()
         self.speed_factor = 1.0
         self.size = 16
-        self.brain = None
+        self.strain = None
         self.age = 0.0
 
     def update(self, delta):
         self.age += delta
 
     def reset(self):
-        self.brain = None
+        self.strain = None
         self.age = 0.0
 
     def get_rect(self):
@@ -69,7 +94,7 @@ class Game:
         self.reseed()
 
     def reseed(self):
-        self.waiting = [Brain.basic(8, 3, 64) for _ in range(1000)]
+        self.waiting = [Strain.basic() for _ in range(1000)]
 
     def draw_text(self, text, pos):
         surface = self.font.render(text, True, "ivory")
@@ -82,7 +107,7 @@ class Game:
         if self.state == State.NONE:
             pass
         elif self.state == State.CHASING:
-            pygame.draw.rect(self.screen, self.prey.color, self.prey.get_rect())
+            pygame.draw.rect(self.screen, self.prey.strain.color, self.prey.get_rect())
             pygame.draw.circle(self.screen, self.predator.color,
                                self.predator.pos, self.predator_radius)
             self.draw_text("Prey age {}".format(round(self.prey.age, 2)), (10, 30))
@@ -95,11 +120,14 @@ class Game:
                 age, _ = self.best[i]
                 self.draw_text("{}".format(round(age, 2)), (10, offset))
                 offset += 20
+        ids = [strain.id for _, strain in self.best]
+        self.draw_text("Strains {}".format(len(set(ids))), (10, 70))
 
-    def start_simulation(self, brain):
+
+    def start_simulation(self, strain):
         # set prey
         self.prey.reset()
-        self.prey.brain = brain
+        self.prey.strain = strain
         self.prey.pos = pygame.Vector2(self.field.center)
         self.prey.pos.x = self.field.right - 32
         # set predator
@@ -110,14 +138,14 @@ class Game:
 
     def kill_prey(self):
         self.state = State.NONE
-        self.results.append((self.prey.age, self.prey.brain))
+        self.results.append((self.prey.age, self.prey.strain))
 
     def update(self, delta):
         if self.state == State.NONE:
             if self.waiting:
-                brain = self.waiting[0]
-                self.waiting.remove(brain)
-                self.start_simulation(brain)
+                strain = self.waiting[0]
+                self.waiting.remove(strain)
+                self.start_simulation(strain)
             else:
                 self.state = State.END
         elif self.state == State.CHASING:
@@ -131,7 +159,7 @@ class Game:
                 self.predator.pos += dir * self.movement_speed * delta * 0.5
             # prey
             self.prey.update(delta)
-            inputs = self.prey.brain.new_inputs()
+            inputs = self.prey.strain.brain.new_inputs()
             inputs[0] = self.prey.pos.x
             inputs[1] = self.prey.pos.y
             inputs[2] = self.predator.pos.x
@@ -140,7 +168,7 @@ class Game:
             inputs[5] = self.field.top
             inputs[6] = self.field.right
             inputs[7] = self.field.bottom
-            outputs = self.prey.brain.process(inputs)
+            outputs = self.prey.strain.brain.process(inputs)
             dir = pygame.Vector2(outputs[0], outputs[1]).normalize()
             self.prey.pos += dir * self.movement_speed * outputs[2] * delta
             if not self.field.collidepoint(self.prey.pos):
@@ -148,12 +176,11 @@ class Game:
                 return
         elif self.state == State.END:
             pool = self.best + self.results
-            self.best = heapq.nlargest(15, pool, lambda x: x[0])
+            self.best = heapq.nlargest(100, pool, lambda x: x[0])
             self.results.clear()
-            for _, brain in self.best:
+            for _, strain in self.best:
                 for _ in range(2):
-                    child = brain.copy()
-                    child.mutate(0.20)
+                    child = strain.split()
                     self.waiting.append(child)
             self.generation += 1
             self.state = State.NONE
