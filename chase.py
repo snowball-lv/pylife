@@ -2,6 +2,7 @@ import pygame
 import random
 import enum
 import heapq
+import math
 from brain import Brain
 
 pygame.init()
@@ -25,7 +26,7 @@ class Strain:
 
     def basic():
         strain = Strain()
-        strain.brain = Brain.basic(8, 3, 64)
+        strain.brain = Brain.basic(8, 3, 16)
         strain.id = Strain.ID_COUNTER
         Strain.ID_COUNTER += 1
         strain.color = random_color()
@@ -96,9 +97,56 @@ class Game:
     def reseed(self):
         self.waiting = [Strain.basic() for _ in range(1000)]
 
-    def draw_text(self, text, pos):
-        surface = self.font.render(text, True, "ivory")
+    def draw_text(self, text, pos, color = "ivory"):
+        surface = self.font.render(text, True, color)
         self.screen.blit(surface, pos)
+
+    def vec2(self, x, y):
+        return pygame.Vector2(x, y)
+
+    def draw_pie(self):
+        pie_radius = 96
+        screen_width, screeen_height = self.screen.get_size()
+        center = pygame.Vector2(
+            screen_width - pie_radius - 16,
+            screeen_height - pie_radius - 16)
+        pygame.draw.circle(
+            self.screen,
+            "gray10",
+            center,
+            pie_radius)
+        colors = {strain.id: strain.color for _, strain in self.best}
+        population = {strain.id: 0 for _, strain in self.best}
+        for _, strain in self.best:
+            population[strain.id] += 1
+        total = sum(population.values())
+        if not total:
+            return
+        offset = 0.0
+        for id in colors:
+            color = colors[id]
+            num = population[id]
+            fraction = num / float(total)
+            deg_from = offset
+            deg_to = round(deg_from + 360 * fraction)
+            offset = deg_to
+            points = []
+            points.append(center)
+            # first = pygame.Vector2(
+            #     math.cos(math.radians(deg_from)),
+            #     math.sin(math.radians(deg_from)))
+            # points.append(center + first * pie_radius)
+            ndegrees = deg_to - deg_from
+            for i in range(int(ndegrees)):
+                point = pygame.Vector2(
+                    math.cos(math.radians(deg_from + i)),
+                    math.sin(math.radians(deg_from + i)))
+                points.append(center + point * (pie_radius - 4))
+            last = pygame.Vector2(
+                math.cos(math.radians(deg_to + 0.01)),
+                math.sin(math.radians(deg_to + 0.01)))
+            points.append(center + last * (pie_radius - 4))
+            pygame.draw.polygon(self.screen, color, points)
 
     def draw(self):
         self.screen.fill("black")
@@ -116,12 +164,15 @@ class Game:
             offset = 200
             self.draw_text("Best results", (10, offset))
             offset += 20
-            for i in range(len(self.best)):
+            for i in range(min(10, len(self.best))):
                 age, _ = self.best[i]
-                self.draw_text("{}".format(round(age, 2)), (10, offset))
+                self.draw_text(
+                    "{}".format(round(age, 2)), (10, offset),
+                    color = self.best[i][1].color)
                 offset += 20
         ids = [strain.id for _, strain in self.best]
         self.draw_text("Strains {}".format(len(set(ids))), (10, 70))
+        self.draw_pie()
 
 
     def start_simulation(self, strain):
@@ -177,6 +228,7 @@ class Game:
         elif self.state == State.END:
             pool = self.best + self.results
             self.best = heapq.nlargest(100, pool, lambda x: x[0])
+            self.best = sorted(self.best, key = lambda x : x[0])
             self.results.clear()
             for _, strain in self.best:
                 for _ in range(2):
