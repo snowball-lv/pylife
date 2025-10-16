@@ -4,6 +4,7 @@ import enum
 import heapq
 import math
 from brain import Brain
+import sys
 
 pygame.init()
 pygame.font.init()
@@ -92,10 +93,23 @@ class Game:
         self.best = []
         self.generation = 0
         self.headless = False
+        self.brain_files = sys.argv[1:]
+        self.waiting = []
         self.reseed()
 
     def reseed(self):
-        self.waiting = [Strain.basic() for _ in range(1000)]
+        print(sys.argv)
+        if len(self.brain_files) > 0:
+            print("Loading brain files")
+            for brain_file in self.brain_files:
+                print("Loading {}".format(brain_file))
+                brain = Brain.load(brain_file)
+                strain = Strain.basic()
+                strain.brain = brain
+                self.waiting.append(strain)
+        else:
+            print("Random reseed")
+            self.waiting = [Strain.basic() for _ in range(1000)]
 
     def draw_text(self, text, pos, color = "ivory"):
         surface = self.font.render(text, True, color)
@@ -247,6 +261,12 @@ class Game:
                 print("Killing current prey")
                 if self.state == State.CHASING:
                     self.kill_prey()
+                    return True
+            elif event.key == pygame.K_d:
+                if self.state == State.CHASING:
+                    print("Dumping brain")
+                    self.prey.strain.brain.dump("brain.json")
+                    return True
         return False
 
     def run(self):

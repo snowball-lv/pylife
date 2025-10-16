@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import json
 
 class Layer:
 
@@ -41,6 +42,24 @@ class Layer:
         for i in range(len(self.biases)):
             self.biases[i] += np.random.uniform(-strength, strength)
 
+    def to_dict(self):
+        obj = {}
+        obj["inputs"] = self.num_in
+        obj["outputs"] = self.num_out
+        obj["weights"] = []
+        for weights in self.weights:
+            obj["weights"].append(list(weights))
+        obj["biases"] = list(self.biases)
+        return obj
+    
+    def from_dict(layer_dict):
+        layer = Layer(layer_dict["inputs"], layer_dict["outputs"])
+        layer.weights.clear()
+        for weights_list in layer_dict["weights"]:
+            layer.weights.append(np.array(weights_list))
+        layer.biases = np.array(layer_dict["biases"])
+        return layer
+
 class Brain:
 
     def __init__(self):
@@ -72,4 +91,26 @@ class Brain:
 
     def new_inputs(self):
         return np.zeros(self.layers[0].num_in)
+
+    def to_dict(self):
+        obj = {}
+        obj["layers"] = []
+        for layer in self.layers:
+            obj["layers"].append(layer.to_dict())
+        return obj
+
+    def from_dict(brain_dict):
+        brain = Brain()
+        for layer_dict in brain_dict["layers"]:
+            brain.layers.append(Layer.from_dict(layer_dict))
+        return brain
+
+    def dump(self, path):
+        with open(path, "w") as file:
+            json.dump(self.to_dict(), file, indent = 4)
+
+    def load(path):
+        with open(path) as file:
+            return Brain.from_dict(json.load(file))
+        return None
 
