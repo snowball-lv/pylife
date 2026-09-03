@@ -69,9 +69,14 @@ class Brain:
         self.layers.append(Layer(num_in, num_out))
 
     def process(self, inputs):
+        assert len(inputs) <= self.layers[0].num_in
+        layer_inputs = np.zeros(self.layers[0].num_in)
+        for i in range(len(inputs)):
+            layer_inputs[i] = inputs[i]
+        tmp = layer_inputs
         for layer in self.layers:
-            inputs = layer.process(inputs)
-        return inputs
+            tmp = layer.process(tmp)
+        return tmp
 
     def basic(num_in, num_out, num_hidden):
         brain = Brain()
